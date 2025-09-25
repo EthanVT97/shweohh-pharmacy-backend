@@ -9,7 +9,14 @@
     "dev": "nodemon src/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["pharmacy", "viber-bot", "myanmar", "supabase"],
+  "keywords": [
+    "pharmacy",
+    "viber-bot",
+    "myanmar",
+    "supabase",
+    "backend",
+    "express"
+  ],
   "author": "ရွှေအိုး Pharmacy Team",
   "license": "MIT",
   "dependencies": {
@@ -23,6 +30,9 @@
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
+  },
+  "resolutions": {
+    "multer": "^1.4.4"
   },
   "engines": {
     "node": ">=18.0.0"
