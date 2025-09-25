@@ -78,7 +78,7 @@ const customerRoutes = (supabase) => {
     }
   });
 
-  // Create or update customer
+  // Create or update customer (upsert based on viber_id)
   router.post('/', async (req, res) => {
     try {
       const { viber_id, name, phone, address } = req.body;
@@ -90,16 +90,28 @@ const customerRoutes = (supabase) => {
         });
       }
 
+      // Check if customer exists by viber_id for setting first_seen
+      const { data: existingCustomer } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('viber_id', viber_id)
+        .single();
+
+      let upsertData = {
+        viber_id,
+        name,
+        phone,
+        address,
+        last_active: new Date()
+      };
+
+      if (!existingCustomer) {
+        upsertData.first_seen = new Date();
+      }
+      
       const { data, error } = await supabase
         .from('customers')
-        .upsert({
-          viber_id,
-          name,
-          phone,
-          address,
-          last_active: new Date(),
-          first_seen: new Date()
-        })
+        .upsert(upsertData, { onConflict: 'viber_id' }) // Use onConflict for proper upsert based on viber_id
         .select()
         .single();
 
@@ -118,25 +130,34 @@ const customerRoutes = (supabase) => {
     }
   });
 
-  // Update customer
+  // Update customer by internal ID
   router.put('/:id', async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, phone, address } = req.body;
-      
+      const { name, phone, address, viber_id } = req.body; 
+
       const { data, error } = await supabase
         .from('customers')
         .update({
           name,
           phone,
           address,
-          last_active: new Date()
+          viber_id, // Allow updating viber_id, though typically internal ID is stable
+          last_active: new Date(),
+          updated_at: new Date() 
         })
         .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
+
+      if (!data) {
+        return res.status(404).json({
+          success: false,
+          error: 'Customer not found for update'
+        });
+      }
 
       res.json({
         success: true,
@@ -151,41 +172,21 @@ const customerRoutes = (supabase) => {
     }
   });
 
-  // Get customer statistics
-  router.get('/stats/summary', async (req, res) => {
+  // Delete customer
+  router.delete('/:id', async (req, res) => {
     try {
-      const { data: customers, error: customersError } = await supabase
-        .from('customers')
-        .select('id, created_at');
-
-      const { data: orders, error: ordersError } = await supabase
-        .from('orders')
-        .select('customer_id, total_amount, created_at');
-
-      if (customersError || ordersError) {
-        throw customersError || ordersError;
-      }
-
-      // Calculate statistics
-      const totalCustomers = customers.length;
+      const { id } = req.params;
       
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const newCustomersToday = customers.filter(c => 
-        new Date(c.created_at) >= today
-      ).length;
+      const { error } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', id);
 
-      const totalOrders = orders.length;
-      const totalRevenue = orders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+      if (error) throw error;
 
       res.json({
         success: true,
-        data: {
-          total_customers: totalCustomers,
-          new_customers_today: newCustomersToday,
-          total_orders: totalOrders,
-          total_revenue: totalRevenue
-        }
+        message: 'Customer deleted successfully'
       });
     } catch (error) {
       res.status(500).json({
