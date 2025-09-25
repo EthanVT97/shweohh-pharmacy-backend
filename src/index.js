@@ -152,7 +152,7 @@ class RateLimiter {
 const messageTemplates = {
   welcome: {
     // Base text only, buttons will provide the options
-    myanmar_base: `‌ေရွှအိုး ဆေးဆိုင်မှ ကြိုဆိုပါတယ်! 🏪
+    myanmar_base: `‌‌ရွှေအိုး ဆေးဆိုင်မှ ကြိုဆိုပါတယ်! 🏪
 ဖွင့်ချိန်: နံနက် ၉နာရီ - ည ၉နာရီ`,
     english_base: `Welcome to ရွှေအိုး Pharmacy! 🏪
 Open Hours: 9AM - 9PM Daily`
