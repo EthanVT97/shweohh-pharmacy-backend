@@ -447,7 +447,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 <div align="center">
 
-**Built with ❤️ in Myanmar for ရွှေအိုး Pharmacy**
+**Developed by Ethan Victor for ရွှေအိုး Pharmacy**
 
 *Empowering healthcare accessibility through technology*
 
