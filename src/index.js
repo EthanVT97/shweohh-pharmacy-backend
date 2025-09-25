@@ -11,6 +11,8 @@ import orderRoutes from './routes/orders.js';
 import productRoutes from './routes/products.js';
 import customerRoutes from './routes/customers.js';
 import prescriptionRoutes from './routes/prescriptions.js';
+import messageRoutes from './routes/messages.js';
+import viberService from './services/viberService.js';
 
 dotenv.config();
 
@@ -73,7 +75,8 @@ app.get('/', (req, res) => {
       products: "/api/products",
       orders: "/api/orders",
       customers: "/api/customers",
-      prescriptions: "/api/prescriptions"
+      prescriptions: "/api/prescriptions",
+      messages: "/api/messages"
     },
     database: "Supabase PostgreSQL"
   });
@@ -99,30 +102,73 @@ app.get('/health', async (req, res) => {
 
 app.post('/webhook', async (req, res) => {
   try {
-    const { event, message, sender } = req.body;
+    const { event, message, sender, message_token } = req.body;
     
     if (event === 'message') {
       const combinedWelcomeText = `${welcomeMessages.myanmar}\n\n${welcomeMessages.english.replace('Welcome to ရွှေအိုး Pharmacy! 🏪\n\n', '')}`;
-      const welcomeMessage = {
-        receiver: sender.id,
-        min_api_version: 7,
-        type: "text",
-        text: combinedWelcomeText
-      };
-
-      const { error } = await supabase
+      
+      const { data: customerData, error: customerError } = await supabase
         .from('customers')
         .upsert({
           viber_id: sender.id,
           name: sender.name,
           first_seen: new Date(),
           last_active: new Date()
-        }, { onConflict: 'viber_id' });
+        }, { onConflict: 'viber_id' })
+        .select('id')
+        .single();
 
-      if (error) console.error('Error upserting customer from webhook:', error);
+      if (customerError) {
+        console.error('Error upserting customer from webhook:', customerError);
+        return res.status(500).json({ error: customerError.message });
+      }
 
-      res.json(welcomeMessage); 
-    } else {
+      const customerId = customerData.id;
+
+      const { data: savedMessage, error: messageSaveError } = await supabase
+        .from('messages')
+        .insert({
+          customer_id: customerId,
+          sender_type: 'customer',
+          message_text: message.text,
+          viber_message_id: message_token,
+          created_at: new Date()
+        })
+        .select();
+
+      if (messageSaveError) {
+        console.error('Error saving incoming message:', messageSaveError);
+      } else {
+        io.to('admin_room').emit('new_customer_message', {
+          customer_id: customerId,
+          customer_name: sender.name,
+          viber_id: sender.id,
+          message: savedMessage[0]
+        });
+      }
+      res.json({ status: 'ok' });
+
+    } else if (event === 'subscribed') {
+      const combinedWelcomeText = `${welcomeMessages.myanmar}\n\n${welcomeMessages.english.replace('Welcome to ရွှေအိုး Pharmacy! 🏪\n\n', '')}`;
+      const { data: customerData, error: customerError } = await supabase
+        .from('customers')
+        .upsert({
+          viber_id: sender.id,
+          name: sender.name,
+          first_seen: new Date(),
+          last_active: new Date()
+        }, { onConflict: 'viber_id' })
+        .select('id')
+        .single();
+
+      if (customerError) {
+        console.error('Error upserting customer on subscribe:', customerError);
+      } else {
+        await viberService.sendViberMessage(sender.id, combinedWelcomeText);
+      }
+      res.json({ status: 'ok' });
+    }
+    else {
       res.json({ status: 'ok' });
     }
   } catch (error) {
@@ -135,6 +181,7 @@ app.use('/api/orders', orderRoutes(supabase, io));
 app.use('/api/products', productRoutes(supabase));
 app.use('/api/customers', customerRoutes(supabase));
 app.use('/api/prescriptions', prescriptionRoutes(supabase));
+app.use('/api/messages', messageRoutes(supabase));
 
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
@@ -146,6 +193,46 @@ io.on('connection', (socket) => {
   
   socket.on('new_order', (orderData) => {
     socket.to('admin_room').emit('order_created', orderData);
+  });
+
+  socket.on('admin_send_message', async ({ customerViberId, customerId, messageText }) => {
+    try {
+      if (!customerViberId || !customerId || !messageText) {
+        throw new Error('Missing customerViberId, customerId, or messageText for admin_send_message');
+      }
+
+      const viberResponse = await viberService.sendViberMessage(customerViberId, messageText);
+
+      if (!viberResponse.success) {
+        throw new Error(viberResponse.error);
+      }
+
+      const { data: savedMessage, error: messageSaveError } = await supabase
+        .from('messages')
+        .insert({
+          customer_id: customerId,
+          sender_type: 'admin',
+          message_text: messageText,
+          created_at: new Date()
+        })
+        .select();
+
+      if (messageSaveError) {
+        console.error('Error saving admin message to DB:', messageSaveError);
+      }
+
+      io.to('admin_room').emit('new_admin_message', {
+        customer_id: customerId,
+        viber_id: customerViberId,
+        message: savedMessage ? savedMessage[0] : { message_text: messageText, sender_type: 'admin', created_at: new Date() }
+      });
+      
+      console.log(`Admin sent message to ${customerViberId}: ${messageText}`);
+
+    } catch (error) {
+      console.error('Error handling admin_send_message:', error);
+      socket.emit('admin_message_error', { error: error.message });
+    }
   });
   
   socket.on('disconnect', () => {
