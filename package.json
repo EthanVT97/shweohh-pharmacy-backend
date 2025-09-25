@@ -1,13 +1,17 @@
 {
   "name": "shwe-oo-pharmacy-backend",
   "version": "1.0.0",
-  "description": "Backend for ရွှေအိုး Pharmacy Viber Bot",
+  "description": "Backend API for ရွှေအိုး Pharmacy Viber Bot System",
   "main": "src/index.js",
+  "type": "module",
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "render-build": "npm install"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "keywords": ["pharmacy", "viber-bot", "myanmar", "supabase"],
+  "author": "ရွှေအိုး Pharmacy Team",
+  "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
     "cors": "^2.8.5",
@@ -15,10 +19,12 @@
     "@supabase/supabase-js": "^2.38.0",
     "socket.io": "^4.7.2",
     "multer": "^1.4.5",
-    "axios": "^1.5.0",
-    "viber-bot": "^1.0.10"
+    "axios": "^1.5.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
   },
   "engines": {
-    "node": "18.x"
+    "node": ">=18.0.0"
   }
 }
