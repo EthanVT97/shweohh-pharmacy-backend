@@ -1,13 +1,22 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const { createClient } = require('@supabase/supabase-js');
-const http = require('http');
-const socketIo = require('socket.io');
+import express from 'express';
+import cors from 'cors';
+import { createClient } from '@supabase/supabase-js';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
+import dotenv from 'dotenv';
+
+// Routes
+import orderRoutes from './routes/orders.js';
+import productRoutes from './routes/products.js';
+import customerRoutes from './routes/customers.js';
+import prescriptionRoutes from './routes/prescriptions.js';
+
+// Load environment variables
+dotenv.config();
 
 const app = express();
-const server = http.createServer(app);
-const io = socketIo(server, {
+const server = createServer(app);
+const io = new Server(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"]
@@ -22,109 +31,87 @@ const supabase = createClient(
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
 // Welcome Message Route
 app.get('/', (req, res) => {
   res.json({
+    success: true,
     message: "Welcome to ရွှေအိုး Pharmacy Backend API! 🏪",
     version: "1.0.0",
-    status: "Running successfully on Render",
+    timestamp: new Date().toISOString(),
     endpoints: {
       welcome: "/",
       health: "/health",
       products: "/api/products",
       orders: "/api/orders",
-      customers: "/api/customers"
+      customers: "/api/customers",
+      prescriptions: "/api/prescriptions"
     },
-    database: "Connected to Supabase PostgreSQL"
+    database: "Supabase PostgreSQL"
   });
 });
 
 // Health Check Route
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    database: 'Supabase Connected'
-  });
-});
-
-// Viber Bot Welcome Message
-app.post('/api/viber/welcome', async (req, res) => {
+app.get('/health', async (req, res) => {
   try {
-    const { user_id, user_name } = req.body;
+    // Test database connection
+    const { data, error } = await supabase.from('products').select('count').limit(1);
     
-    const welcomeMessage = {
-      receiver: user_id,
-      min_api_version: 7,
-      type: "text",
-      text: `ဆေးဆိုင်မှ ကြိုဆိုပါတယ်! 🏪\n\nWelcome to ရွှေအိုး Pharmacy!\n\nကျေးဇူးပြု၍ အောက်ပါ option များမှ ရွေးချယ်ပါ:\n\n1️⃣ - ဆေးဝါးများ ရှာဖွေရန်\n2️⃣ - အမှာစာတင်ရန်\n3️⃣ - ဆေးညွှန်းပို့ရန်\n4️⃣ - အကူအညီလိုချင်ပါက\n\nWe're here to serve you 9AM-9PM daily!`
-    };
-
-    // Save customer to Supabase
-    const { data, error } = await supabase
-      .from('customers')
-      .upsert({
-        viber_id: user_id,
-        name: user_name,
-        first_seen: new Date(),
-        last_active: new Date()
-      });
-
-    res.json(welcomeMessage);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Products Routes
-app.get('/api/products', async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('status', 'active')
-      .order('name');
-    
-    if (error) throw error;
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Orders Routes
-app.post('/api/orders', async (req, res) => {
-  try {
-    const { customer_id, items, total, address } = req.body;
-    
-    const { data, error } = await supabase
-      .from('orders')
-      .insert({
-        customer_id,
-        items,
-        total_amount: total,
-        delivery_address: address,
-        status: 'pending',
-        created_at: new Date()
-      })
-      .select();
-    
-    if (error) throw error;
-    
-    // Real-time update via Socket.io
-    io.emit('new_order', data[0]);
-    
-    res.json({ 
-      success: true, 
-      order: data[0],
-      message: "အမှာစာ အောင်မြင်စွာ တင်ပြီးပါပြီ!"
+    res.json({
+      status: 'OK',
+      database: error ? 'Disconnected' : 'Connected',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV
     });
   } catch (error) {
+    res.status(500).json({ 
+      status: 'Error', 
+      error: error.message 
+    });
+  }
+});
+
+// Viber Webhook Route
+app.post('/webhook', async (req, res) => {
+  try {
+    const { event, message, sender } = req.body;
+    
+    if (event === 'message') {
+      // Handle incoming message
+      const welcomeMessage = {
+        receiver: sender.id,
+        min_api_version: 7,
+        type: "text",
+        text: `ဆေးဆိုင်မှ ကြိုဆိုပါတယ်! 🏪\n\nWelcome to ရွှေအိုး Pharmacy!\n\nကျေးဇူးပြု၍ အောက်ပါ option များမှ ရွေးချယ်ပါ:\n\n1️⃣ - ဆေးဝါးများ ရှာဖွေရန်\n2️⃣ - အမှာစာတင်ရန်\n3️⃣ - ဆေးညွှန်းပို့ရန်\n4️⃣ - အကူအညီလိုချင်ပါက\n\nWe're here to serve you 9AM-9PM daily!`
+      };
+
+      // Save customer to database
+      const { error } = await supabase
+        .from('customers')
+        .upsert({
+          viber_id: sender.id,
+          name: sender.name,
+          first_seen: new Date(),
+          last_active: new Date()
+        });
+
+      res.json(welcomeMessage);
+    } else {
+      res.json({ status: 'ok' });
+    }
+  } catch (error) {
+    console.error('Webhook error:', error);
     res.status(500).json({ error: error.message });
   }
 });
+
+// API Routes
+app.use('/api/orders', orderRoutes(supabase, io));
+app.use('/api/products', productRoutes(supabase));
+app.use('/api/customers', customerRoutes(supabase));
+app.use('/api/prescriptions', prescriptionRoutes(supabase));
 
 // Socket.io for Real-time Updates
 io.on('connection', (socket) => {
@@ -132,6 +119,11 @@ io.on('connection', (socket) => {
   
   socket.on('join_admin', () => {
     socket.join('admin_room');
+    console.log('Admin joined room');
+  });
+  
+  socket.on('new_order', (orderData) => {
+    socket.to('admin_room').emit('order_created', orderData);
   });
   
   socket.on('disconnect', () => {
@@ -139,9 +131,30 @@ io.on('connection', (socket) => {
   });
 });
 
+// Error Handling Middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({
+    success: false,
+    error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message
+  });
+});
+
+// 404 Handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'Endpoint not found'
+  });
+});
+
 const PORT = process.env.PORT || 3000;
+
 server.listen(PORT, () => {
   console.log(`🚀 ရွှေအိုး Pharmacy Backend running on port ${PORT}`);
-  console.log(`🏪 Welcome Message: Ready to serve customers!`);
+  console.log(`🏪 Environment: ${process.env.NODE_ENV}`);
   console.log(`📊 Database: Supabase Connected`);
+  console.log(`📍 API URL: http://localhost:${PORT}`);
 });
+
+export default app;
