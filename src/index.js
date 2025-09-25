@@ -4,14 +4,14 @@ import { createClient } from '@supabase/supabase-js';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Routes
 import orderRoutes from './routes/orders.js';
 import productRoutes from './routes/products.js';
 import customerRoutes from './routes/customers.js';
 import prescriptionRoutes from './routes/prescriptions.js';
 
-// Load environment variables
 dotenv.config();
 
 const app = express();
@@ -23,18 +23,20 @@ const io = new Server(server, {
   }
 });
 
-// Supabase Configuration
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
 );
 
-// Middleware
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Welcome Message Route
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 app.get('/', (req, res) => {
   res.json({
     success: true,
@@ -53,11 +55,9 @@ app.get('/', (req, res) => {
   });
 });
 
-// Health Check Route
 app.get('/health', async (req, res) => {
   try {
-    // Test database connection
-    const { data, error } = await supabase.from('products').select('count').limit(1);
+    const { data, error } = await supabase.from('products').select('count', { count: 'exact', head: true });
     
     res.json({
       status: 'OK',
@@ -73,13 +73,11 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// Viber Webhook Route
 app.post('/webhook', async (req, res) => {
   try {
     const { event, message, sender } = req.body;
     
     if (event === 'message') {
-      // Handle incoming message
       const welcomeMessage = {
         receiver: sender.id,
         min_api_version: 7,
@@ -87,7 +85,6 @@ app.post('/webhook', async (req, res) => {
         text: `ဆေးဆိုင်မှ ကြိုဆိုပါတယ်! 🏪\n\nWelcome to ရွှေအိုး Pharmacy!\n\nကျေးဇူးပြု၍ အောက်ပါ option များမှ ရွေးချယ်ပါ:\n\n1️⃣ - ဆေးဝါးများ ရှာဖွေရန်\n2️⃣ - အမှာစာတင်ရန်\n3️⃣ - ဆေးညွှန်းပို့ရန်\n4️⃣ - အကူအညီလိုချင်ပါက\n\nWe're here to serve you 9AM-9PM daily!`
       };
 
-      // Save customer to database
       const { error } = await supabase
         .from('customers')
         .upsert({
@@ -95,9 +92,11 @@ app.post('/webhook', async (req, res) => {
           name: sender.name,
           first_seen: new Date(),
           last_active: new Date()
-        });
+        }, { onConflict: 'viber_id' });
 
-      res.json(welcomeMessage);
+      if (error) console.error('Error upserting customer from webhook:', error);
+
+      res.json(welcomeMessage); 
     } else {
       res.json({ status: 'ok' });
     }
@@ -107,13 +106,11 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-// API Routes
 app.use('/api/orders', orderRoutes(supabase, io));
 app.use('/api/products', productRoutes(supabase));
 app.use('/api/customers', customerRoutes(supabase));
 app.use('/api/prescriptions', prescriptionRoutes(supabase));
 
-// Socket.io for Real-time Updates
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
   
@@ -131,7 +128,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// Error Handling Middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
@@ -140,7 +136,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 Handler
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
