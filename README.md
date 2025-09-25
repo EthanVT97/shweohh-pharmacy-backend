@@ -1,83 +1,95 @@
-# ရွှေအိုး Pharmacy - Backend API
+# Shwe Oo Pharmacy - Backend API
 
-Viber Bot နှင့် Admin Dashboard အတွက် Backend API System
+A robust backend API system designed to power the Shwe Oo Pharmacy Viber Bot and Admin Dashboard, facilitating seamless management of product catalogs, order processing, and prescription verification. This API serves as the central hub for all pharmacy operations, ensuring efficient communication and data management.
 
-## 🚀 Features
+## 🚀 Key Features
 
-- ✅ Viber Bot Integration
-- ✅ Product Catalog Management
-- ✅ Order Processing System
-- ✅ Prescription Upload & Verification
-- ✅ Real-time Notifications
-- ✅ Supabase Database
-- ✅ Admin Dashboard API
+*   **Viber Bot Integration**: Seamlessly connect with the Viber platform to handle customer interactions, orders, and inquiries.
+*   **Product Catalog Management**: Comprehensive API for managing pharmacy products, including adding, updating, and retrieving product information.
+*   **Order Processing System**: Streamlined workflow for creating, tracking, and managing customer orders from placement to fulfillment.
+*   **Prescription Upload & Verification**: Secure mechanism for customers to upload prescriptions, with an integrated system for verification.
+*   **Real-time Notifications**: Instant updates for orders, prescriptions, and other critical events.
+*   **Supabase Database Integration**: Leverages Supabase for a scalable and secure backend database solution.
+*   **Admin Dashboard API**: Dedicated endpoints to support the administrative dashboard for comprehensive business management.
 
 ## 📋 Prerequisites
 
-- Node.js 18.0 or higher
-- Supabase account
-- Viber Business Account
+Before you begin, ensure you have the following installed and configured:
+
+*   **Node.js**: Version 18.0 or higher.
+*   **Supabase Account**: An active account for database hosting.
+*   **Viber Business Account**: Required for Viber Bot integration.
 
 ## 🔧 Installation
 
-1. Clone the repository
-```bash
-git clone https://github.com/yourusername/pharmacy-backend.git
-cd pharmacy-backend
-1. Install dependencies
+Follow these steps to get the project up and running on your local machine:
 
-```bash
-npm install
-```
+1.  **Clone the Repository**:
+    ```bash
+    git clone https://github.com/yourusername/pharmacy-backend.git
+    cd pharmacy-backend
+    ```
+2.  **Install Dependencies**:
+    ```bash
+    npm install
+    ```
+3.  **Environment Setup**:
+    Create a `.env` file by copying the example and populate it with your credentials:
+    ```bash
+    cp .env.example .env
+    # Open .env and add your Supabase URL, Supabase Anon Key, and Viber Bot Token.
+    ```
+4.  **Start Development Server**:
+    ```bash
+    npm run dev
+    ```
+    The API will now be running locally, typically on `http://localhost:3000`.
 
-1. Environment setup
+## 🗄️ Database Setup (Supabase)
 
-```bash
-cp .env.example .env
-# Edit .env with your credentials
-```
+This project uses Supabase for its backend database.
 
-1. Start development server
+1.  **Create a New Supabase Project**:
+    Navigate to the Supabase dashboard and create a new project.
+2.  **Run SQL Schema**:
+    Once your project is created, go to the "SQL Editor" and execute the schema provided in `database/schema.sql` to set up your tables and relations.
+3.  **Configure Environment Variables**:
+    Ensure your `.env` file contains the `SUPABASE_URL` and `SUPABASE_ANON_KEY` obtained from your Supabase project settings.
 
-```bash
-npm run dev
-```
+## 🌐 API Endpoints
 
-🗄️ Database Setup
+The following are the primary API endpoints available. For detailed request/response examples, please refer to the API documentation (if available).
 
-1. Create a new Supabase project
-2. Run the SQL schema from database/schema.sql
-3. Configure environment variables
+| Method | Endpoint             | Description                       |
+| :----- | :------------------- | :-------------------------------- |
+| `GET`  | `/`                  | Welcome message for the API       |
+| `GET`  | `/health`            | Health check for the API status   |
+| `GET`  | `/api/products`      | Retrieve a list of all products   |
+| `POST` | `/api/orders`        | Create a new customer order       |
+| `GET`  | `/api/customers`     | Get a list of registered customers |
+| `POST` | `/api/prescriptions` | Upload a new prescription image   |
 
-🌐 API Endpoints
+## 🚢 Deployment
 
-Method Endpoint Description
-GET / Welcome message
-GET /health Health check
-GET /api/products Get all products
-POST /api/orders Create new order
-GET /api/customers Get customers
-POST /api/prescriptions Upload prescription
+This section outlines the process for deploying the backend API, with a focus on Render.
 
-🚢 Deployment
+### Render Deployment
 
-Render Deployment
+1.  **Connect GitHub Repository**:
+    Link your GitHub repository to your Render account.
+2.  **Set Environment Variables**:
+    Configure the following environment variables within your Render service settings:
+    *   `SUPABASE_URL`
+    *   `SUPABASE_ANON_KEY`
+    *   `VIBER_BOT_TOKEN`
+    *   `NODE_ENV=production`
+3.  **Automatic Deployment**:
+    Configure Render to automatically deploy new changes from your connected GitHub branch.
 
-1. Connect GitHub repository to Render
-2. Set environment variables
-3. Deploy automatically
+## 📞 Support
 
-Environment Variables on Render
+For any technical assistance or inquiries, please contact the development team.
 
-· SUPABASE_URL
-· SUPABASE_ANON_KEY
-· VIBER_BOT_TOKEN
-· NODE_ENV=production
+## 📄 License
 
-📞 Support
-
-For technical support, contact the development team.
-
-📄 License
-
-MIT License
+This project is licensed under the MIT License. See the `LICENSE` file for details.
