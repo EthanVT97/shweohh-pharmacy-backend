@@ -27,6 +27,7 @@ const welcomeMessages = {
 4️⃣ - အကူအညီလိုချင်ပါက
 
 ဖွင့်ချိန်: နံနက် ၉နာရီ - ည ၉နာရီ`,
+
   english: `Welcome to ရွှေအိုး Pharmacy! 🏪
 
 Please choose from the following options:
@@ -62,7 +63,6 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// Health check
 app.get('/', (req, res) => {
   res.json({
     success: true,
@@ -100,14 +100,13 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// Webhook for Viber
 app.post('/webhook', async (req, res) => {
   try {
     const { event, message, sender, message_token } = req.body;
-    const combinedWelcomeText = `${welcomeMessages.myanmar}\n\n${welcomeMessages.english.replace('Welcome to ရွှေအိုး Pharmacy! 🏪\n\n', '')}`;
-
-    if (event === 'message' || event === 'subscribed') {
-      // Upsert customer
+    
+    if (event === 'message') {
+      const combinedWelcomeText = `${welcomeMessages.myanmar}\n\n${welcomeMessages.english.replace('Welcome to ရွှေအိုး Pharmacy! 🏪\n\n', '')}`;
+      
       const { data: customerData, error: customerError } = await supabase
         .from('customers')
         .upsert({
@@ -120,79 +119,93 @@ app.post('/webhook', async (req, res) => {
         .single();
 
       if (customerError) {
-        console.error('Customer upsert error:', customerError);
+        console.error('Error upserting customer from webhook:', customerError);
         return res.status(500).json({ error: customerError.message });
       }
 
       const customerId = customerData.id;
 
-      if (event === 'message') {
-        // Save incoming message
-        const { data: savedMessage, error: messageSaveError } = await supabase
-          .from('messages')
-          .insert({
-            customer_id: customerId,
-            sender_type: 'customer',
-            message_text: message.text,
-            viber_message_id: message_token,
-            created_at: new Date()
-          })
-          .select();
+      const { data: savedMessage, error: messageSaveError } = await supabase
+        .from('messages')
+        .insert({
+          customer_id: customerId,
+          sender_type: 'customer',
+          message_text: message.text,
+          viber_message_id: message_token,
+          created_at: new Date()
+        })
+        .select();
 
-        if (messageSaveError) {
-          console.error('Message save error:', messageSaveError);
-        } else {
-          io.to('admin_room').emit('new_customer_message', {
-            customer_id: customerId,
-            customer_name: sender.name,
-            viber_id: sender.id,
-            message: savedMessage[0]
-          });
-        }
+      if (messageSaveError) {
+        console.error('Error saving incoming message:', messageSaveError);
+      } else {
+        io.to('admin_room').emit('new_customer_message', {
+          customer_id: customerId,
+          customer_name: sender.name,
+          viber_id: sender.id,
+          message: savedMessage[0]
+        });
+      }
+      res.json({ status: 'ok' });
 
-      } else if (event === 'subscribed') {
+    } else if (event === 'subscribed') {
+      const combinedWelcomeText = `${welcomeMessages.myanmar}\n\n${welcomeMessages.english.replace('Welcome to ရွှေအိုး Pharmacy! 🏪\n\n', '')}`;
+      const { data: customerData, error: customerError } = await supabase
+        .from('customers')
+        .upsert({
+          viber_id: sender.id,
+          name: sender.name,
+          first_seen: new Date(),
+          last_active: new Date()
+        }, { onConflict: 'viber_id' })
+        .select('id')
+        .single();
+
+      if (customerError) {
+        console.error('Error upserting customer on subscribe:', customerError);
+      } else {
         await viberService.sendViberMessage(sender.id, combinedWelcomeText);
       }
-
-      res.json({ status: 'ok' });
-
-    } else {
       res.json({ status: 'ok' });
     }
-
+    else {
+      res.json({ status: 'ok' });
+    }
   } catch (error) {
     console.error('Webhook error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// API routes
 app.use('/api/orders', orderRoutes(supabase, io));
 app.use('/api/products', productRoutes(supabase));
 app.use('/api/customers', customerRoutes(supabase));
 app.use('/api/prescriptions', prescriptionRoutes(supabase));
 app.use('/api/messages', messageRoutes(supabase));
 
-// Socket.IO
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
-
+  
   socket.on('join_admin', () => {
     socket.join('admin_room');
     console.log('Admin joined room');
   });
-
+  
   socket.on('new_order', (orderData) => {
     socket.to('admin_room').emit('order_created', orderData);
   });
 
   socket.on('admin_send_message', async ({ customerViberId, customerId, messageText }) => {
     try {
-      if (!customerViberId || !customerId || !messageText) throw new Error('Missing fields for admin_send_message');
+      if (!customerViberId || !customerId || !messageText) {
+        throw new Error('Missing customerViberId, customerId, or messageText for admin_send_message');
+      }
 
       const viberResponse = await viberService.sendViberMessage(customerViberId, messageText);
 
-      if (!viberResponse.success) throw new Error(viberResponse.error);
+      if (!viberResponse.success) {
+        throw new Error(viberResponse.error);
+      }
 
       const { data: savedMessage, error: messageSaveError } = await supabase
         .from('messages')
@@ -204,28 +217,29 @@ io.on('connection', (socket) => {
         })
         .select();
 
-      if (messageSaveError) console.error('Admin message save error:', messageSaveError);
+      if (messageSaveError) {
+        console.error('Error saving admin message to DB:', messageSaveError);
+      }
 
       io.to('admin_room').emit('new_admin_message', {
         customer_id: customerId,
         viber_id: customerViberId,
         message: savedMessage ? savedMessage[0] : { message_text: messageText, sender_type: 'admin', created_at: new Date() }
       });
-
+      
       console.log(`Admin sent message to ${customerViberId}: ${messageText}`);
 
     } catch (error) {
-      console.error('admin_send_message error:', error);
+      console.error('Error handling admin_send_message:', error);
       socket.emit('admin_message_error', { error: error.message });
     }
   });
-
+  
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
   });
 });
 
-// Global error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
@@ -234,7 +248,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
@@ -243,6 +256,7 @@ app.use('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+
 server.listen(PORT, () => {
   console.log(`🚀 ရွှေအိုး Pharmacy Backend running on port ${PORT}`);
   console.log(`🏪 Environment: ${process.env.NODE_ENV}`);
