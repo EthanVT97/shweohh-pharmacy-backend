@@ -14,6 +14,30 @@ import prescriptionRoutes from './routes/prescriptions.js';
 
 dotenv.config();
 
+const welcomeMessages = {
+  myanmar: `ဆေးဆိုင်မှ ကြိုဆိုပါတယ်! 🏪
+
+ကျေးဇူးပြု၍ အောက်ပါ option များမှ ရွေးချယ်ပါ:
+
+1️⃣ - ဆေးဝါးများ ရှာဖွေရန်
+2️⃣ - အမှာစာတင်ရန်  
+3️⃣ - ဆေးညွှန်းပို့ရန်
+4️⃣ - အကူအညီလိုချင်ပါက
+
+ဖွင့်ချိန်: နံနက် ၉နာရီ - ည ၉နာရီ`,
+
+  english: `Welcome to ရွှေအိုး Pharmacy! 🏪
+
+Please choose from the following options:
+
+1️⃣ - Search Medicines
+2️⃣ - Place Order
+3️⃣ - Upload Prescription  
+4️⃣ - Need Help
+
+Open Hours: 9AM - 9PM Daily`
+};
+
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
@@ -78,11 +102,12 @@ app.post('/webhook', async (req, res) => {
     const { event, message, sender } = req.body;
     
     if (event === 'message') {
+      const combinedWelcomeText = `${welcomeMessages.myanmar}\n\n${welcomeMessages.english.replace('Welcome to ရွှေအိုး Pharmacy! 🏪\n\n', '')}`;
       const welcomeMessage = {
         receiver: sender.id,
         min_api_version: 7,
         type: "text",
-        text: `ဆေးဆိုင်မှ ကြိုဆိုပါတယ်! 🏪\n\nWelcome to ရွှေအိုး Pharmacy!\n\nကျေးဇူးပြု၍ အောက်ပါ option များမှ ရွေးချယ်ပါ:\n\n1️⃣ - ဆေးဝါးများ ရှာဖွေရန်\n2️⃣ - အမှာစာတင်ရန်\n3️⃣ - ဆေးညွှန်းပို့ရန်\n4️⃣ - အကူအညီလိုချင်ပါက\n\nWe're here to serve you 9AM-9PM daily!`
+        text: combinedWelcomeText
       };
 
       const { error } = await supabase
