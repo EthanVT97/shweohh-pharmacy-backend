@@ -12,5 +12,13 @@ services:
         sync: false
       - key: SUPABASE_ANON_KEY
         sync: false
+      - key: SUPABASE_SERVICE_KEY 
+        sync: false
       - key: VIBER_BOT_TOKEN
+        sync: false
+      - key: UPLOAD_MAX_SIZE 
+        sync: false
+      - key: ALLOWED_FILE_TYPES
+        sync: false
+      - key: APP_NAME
         sync: false
